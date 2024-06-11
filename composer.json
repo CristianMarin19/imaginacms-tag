@@ -21,7 +21,7 @@
   "require-dev": {
     "orchestra/testbench": "^8.5",
     "phpunit/phpunit": "^10",
-    "imagina/page-module": "v10.x-dev"
+    "imagina/page-module": "^10.0"
   },
   "autoload": {
     "psr-4": {
