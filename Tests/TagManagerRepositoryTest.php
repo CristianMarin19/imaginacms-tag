@@ -13,7 +13,7 @@ class TagManagerRepositoryTest extends BaseTestCase
      */
     private $tagManager;
 
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
@@ -38,5 +38,6 @@ class TagManagerRepositoryTest extends BaseTestCase
 class TestModel implements TaggableInterface
 {
     use TaggableTrait, \Modules\Core\Traits\NamespacedEntity;
+
     protected static $entityNamespace = 'asgardcms/media';
 }

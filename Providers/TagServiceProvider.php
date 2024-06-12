@@ -2,6 +2,8 @@
 
 namespace Modules\Tag\Providers;
 
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Events\BuildingSidebar;
 use Modules\Core\Events\LoadingBackendTranslations;
@@ -19,6 +21,7 @@ use Modules\Tag\Repositories\TagRepository;
 class TagServiceProvider extends ServiceProvider
 {
     use CanPublishConfiguration, CanGetSidebarClassForModule;
+
     /**
      * Indicates if loading of the provider is deferred.
      *
@@ -28,8 +31,6 @@ class TagServiceProvider extends ServiceProvider
 
     /**
      * Register the service provider.
-     *
-     * @return void
      */
     public function register()
     {
@@ -44,7 +45,7 @@ class TagServiceProvider extends ServiceProvider
         );
 
         $this->app['events']->listen(LoadingBackendTranslations::class, function (LoadingBackendTranslations $event) {
-            $event->load('tags', array_dot(trans('tag::tags')));
+            $event->load('tags', Arr::dot(trans('tag::tags')));
         });
 
         app('router')->bind('tag__tag', function ($id) {
@@ -54,20 +55,19 @@ class TagServiceProvider extends ServiceProvider
 
     public function boot()
     {
-        $this->publishConfig('tag', 'permissions');
+        $this->mergeConfigFrom($this->getModuleConfigFilePath('tag', 'permissions'), 'asgard.tag.permissions');
         $this->publishConfig('tag', 'config');
         $this->registerBladeTags();
-        $this->loadMigrationsFrom(__DIR__ . '/../Database/Migrations');
+        //$this->loadMigrationsFrom(__DIR__ . '/../Database/Migrations');
+        $this->registerComponents();
     }
 
     /**
      * Get the services provided by the provider.
-     *
-     * @return array
      */
     public function provides()
     {
-        return array();
+        return [];
     }
 
     private function registerBindings()
@@ -95,5 +95,13 @@ class TagServiceProvider extends ServiceProvider
         $this->app['blade.compiler']->directive('tags', function ($value) {
             return "<?php echo TagWidget::show([$value]); ?>";
         });
+    }
+
+    /**
+     * Register Blade components
+     */
+    private function registerComponents()
+    {
+        Blade::componentNamespace("Modules\Tag\View\Components", 'tag');
     }
 }

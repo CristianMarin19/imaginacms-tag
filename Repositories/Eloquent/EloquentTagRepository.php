@@ -13,8 +13,6 @@ class EloquentTagRepository extends EloquentBaseRepository implements TagReposit
 {
     /**
      * Get all the tags in the given namespace
-     * @param string $namespace
-     * @return \Illuminate\Database\Eloquent\Collection
      */
     public function allForNamespace($namespace)
     {
@@ -39,5 +37,22 @@ class EloquentTagRepository extends EloquentBaseRepository implements TagReposit
         event(new TagWasUpdated($tag));
 
         return $tag;
+    }
+
+    public function getItemsBy($params = false)
+    {
+        $tags = collect();
+        $taggable = collect(\DB::table('tag__tagged')->where('tag_id', $params->filter->tagId)->get());
+        $taggable = $taggable->groupBy('taggable_type');
+        foreach ($taggable as $key => $entity) {
+            $repository = config('asgard.tag.config.repositoriesEntities.'.$key);
+            if (! is_null($repository)) {
+                $repository = app($repository);
+                $tag = $repository->getItemsBy($params);
+                $tags = $tags->concat($tag);
+            }
+        }
+
+        return $tags;
     }
 }

@@ -5,40 +5,57 @@ namespace Modules\Tag\Traits;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Support\Arr;
 use Modules\Tag\Entities\Tag;
 
 trait TaggableTrait
 {
     protected static $tagsModel = Tag::class;
 
-    public static function getTagsModel(): string
-    {
-        return static::$tagsModel;
-    }
+  public static function bootTaggableTrait()
+  {
+    //Listen event after create model
+    static::createdWithBindings(function ($model) {
+      $model->syncTags($model->getEventBindings('createdWithBindings'));
+    });
+    //Listen event after update model
+    static::updatedWithBindings(function ($model) {
+      $model->syncTags($model->getEventBindings('updatedWithBindings'));
+    });
+  }
+
+  public function syncTags($params)
+  {
+    $this->setTags($params['data']['tags'] ?? []);
+  }
+
+  public static function getTagsModel(): string
+  {
+    return static::$tagsModel;
+  }
 
     public static function setTagsModel(string $model)
     {
         static::$tagsModel = $model;
     }
 
-    public function scopeWhereTag(Builder $query, $tags, string $type = 'slug'): Builder
-    {
-        $query->with('translations');
+  public function scopeWhereTag(Builder $query, $tags, string $type = 'slug'): Builder
+  {
+    $tags = is_array($tags) ? $tags : explode(' ', trim($tags));
 
-        foreach (array_wrap($tags) as $tag) {
-            $query->whereHas('tags', function (Builder $query) use ($type, $tag) {
-                $query->whereHas('translations', function (Builder $query) use ($type, $tag) {
-                    $query->where($type, $tag);
-                });
-            });
-        }
+    $query->whereIn('id', function ($q) use ($tags) {
+      $q->from('tag__tagged')
+        ->select('tag__tagged.taggable_id')
+        ->leftJoin('tag__tag_translations', 'tag__tag_translations.tag_id', '=', 'tag__tagged.tag_id')
+        ->whereIn('tag__tag_translations.slug', $tags);
+    });
 
         return $query;
     }
 
     public function scopeWithTag(Builder $query, $tags, string $type = 'slug'): Builder
     {
-        $tags = array_wrap($tags);
+        $tags = Arr::wrap($tags);
 
         $query->with('translations');
 
@@ -63,7 +80,7 @@ trait TaggableTrait
     {
         $instance = new static;
 
-        return self::createTagsModel()->with('translations')->where('namespace', $instance->getEntityClassName());
+        return self::createTagsModel()->with('translations');
     }
 
     public function setTags($tags, string $type = 'slug'): bool
@@ -94,7 +111,7 @@ trait TaggableTrait
 
     public function tag($tags): bool
     {
-        foreach (array_wrap($tags) as $tag) {
+        foreach (Arr::wrap($tags) as $tag) {
             $this->addTag($tag);
         }
 
@@ -163,17 +180,22 @@ trait TaggableTrait
         // Convert all dashes/underscores into separator
         $flip = $separator == '-' ? '_' : '-';
 
-        $name = preg_replace('![' . preg_quote($flip, '!') . ']+!u', $separator, $name);
+        $name = preg_replace('!['.preg_quote($flip, '!').']+!u', $separator, $name);
 
         // Replace @ with the word 'at'
-        $name = str_replace('@', $separator . 'at' . $separator, $name);
+        $name = str_replace('@', $separator.'at'.$separator, $name);
 
         // Remove all characters that are not the separator, letters, numbers, or whitespace.
-        $name = preg_replace('![^' . preg_quote($separator, '!') . '\pL\pN\s]+!u', '', mb_strtolower($name));
+        $name = preg_replace('![^'.preg_quote($separator, '!').'\pL\pN\s]+!u', '', mb_strtolower($name));
 
         // Replace all separator characters and whitespace by a single separator
-        $name = preg_replace('![' . preg_quote($separator, '!') . '\s]+!u', $separator, $name);
+        $name = preg_replace('!['.preg_quote($separator, '!').'\s]+!u', $separator, $name);
 
-        return trim($name, $separator);
-    }
+    return trim($name, $separator);
+  }
+
+  public function getNameTags()
+  {
+    return $this->tags->pluck('name')->toArray();
+  }
 }
